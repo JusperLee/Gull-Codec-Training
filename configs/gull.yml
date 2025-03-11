@@ -1,0 +1,104 @@
+exp: 
+  dir: ./Exps
+  name: Gull-100kbps-RVQ-5-GAN
+
+# seed: 614020
+
+datas:
+  _target_: look2hear.datas.MusdbMoisesdbDataModule
+  train_dir: /gpfs-flash/hulab/public_datasets/audio_datasets/musdb18hq-moises-hdf5
+  eval_dir: /gpfs-flash/hulab/public_datasets/audio_datasets/musdb18hq-moises-val-test/val
+  sr: 44100
+  segments: 3
+  num_stems: 8
+  snr_range: [-10, 10]
+  num_samples: 50000
+  batch_size: 5
+  num_workers: 20
+
+model:
+  _target_: look2hear.models.Gull
+  window_size: 20
+  hop_size: 10
+  sample_rate: 44100
+  in_channels: 128
+  num_layers: 4
+  total_bps :  100000
+  num_RVQ :  5
+
+discriminator:
+  _target_: look2hear.models.MultiFrequencyDiscriminator
+  in_channels: 128
+
+optimizer_g:
+  _target_: torch.optim.AdamW
+  lr: 0.001
+  weight_decay: 0.01
+  betas: [0.5, 0.99]
+
+optimizer_d:
+  _target_: torch.optim.AdamW
+  lr: 0.0001
+  weight_decay: 0.01
+  betas: [0.5, 0.99]
+
+scheduler_g:
+  _target_: torch.optim.lr_scheduler.StepLR
+  step_size: 2
+  gamma: 0.98
+
+scheduler_d:
+  _target_: torch.optim.lr_scheduler.StepLR
+  step_size: 2
+  gamma: 0.98
+
+loss_g:
+  _target_: look2hear.losses.GeneratorLoss
+  win: 20
+
+loss_d:
+  _target_: look2hear.losses.DiscriminatorLoss
+  win: 20
+
+metrics:
+  _target_: look2hear.losses.SingleSrcNegSDR
+  sdr_type: sisdr
+  reduction: mean
+
+system:
+  _target_: look2hear.system.AudioLightningModule
+
+early_stopping:
+  _target_: pytorch_lightning.callbacks.EarlyStopping
+  monitor: val_loss
+  patience: 10
+  mode: min
+  verbose: true
+
+checkpoint:
+  _target_: pytorch_lightning.callbacks.ModelCheckpoint
+  dirpath: ${exp.dir}/${exp.name}/checkpoints
+  monitor: val_loss
+  mode: min
+  verbose: true
+  save_top_k: 5
+  save_last: true
+  filename: '{epoch}-{val_loss:.4f}'
+
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  name: ${exp.name}
+  save_dir: ${exp.dir}/${exp.name}/logs
+  offline: false
+  project: Gull-implement
+
+trainer:
+  _target_: pytorch_lightning.Trainer
+  devices: [8,9]
+  max_epochs: 500
+  sync_batchnorm: true
+  default_root_dir: ${exp.dir}/${exp.name}/
+  accelerator: cuda
+  limit_train_batches: 1.0
+  fast_dev_run: false
+  

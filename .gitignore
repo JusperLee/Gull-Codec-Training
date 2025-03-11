@@ -1,0 +1,6 @@
+*.pyc
+*.DS_Store
+.vscode
+Exps
+evaluated_mac_params.py
+train_own.py
